@@ -6,28 +6,37 @@ export default function Natiq() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [audioReady, setAudioReady] = useState(false);
-
+  
   function urlSafeBase64Decode(input) {
-    // Replace '-' with '+' and '_' with '/'
+    
     input = input.replace(/-/g, '+').replace(/_/g, '/'); 
-    // Pad the string with '=' characters if needed
     while (input.length % 4 !== 0) {
       input += '=';
     } 
-    // Decode the base64 data
     return atob(input);
   }
   
-
   const callNatiq = () => {
-    // Reset states
+
     setAudioURL('');
     setError(null);
     setAudioReady(false);
     setLoading(true);
-
+    
     const textData = text;
-    const formdata = { text: textData };
+
+    const words = textData.split(' ');
+    const lastWord = words[words.length - 1];
+    const echoedText = textData + ' ' + lastWord + ' ' + lastWord + ' ' + lastWord;
+    
+    const arabicPattern = /[\u0600-\u06FF\s]+/;
+    if (!arabicPattern.test(textData)) {
+      setError('Please enter text in Arabic only.');
+      setLoading(false);
+      return;
+    }
+
+    const formdata = { text: echoedText  };
     const myHeaders = new Headers();
     myHeaders.append('Content-Type', 'application/json');
     const requestOptions = {
@@ -38,11 +47,20 @@ export default function Natiq() {
     };
 
     fetch('https://echo-6sdzv54itq-uc.a.run.app/natiq', requestOptions)
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
       .then((result) => {
-        const decodedAudioData = urlSafeBase64Decode(result.wave);
-        setAudioURL(`data:audio/wav;base64,${decodedAudioData}`);
-        setAudioReady(true);
+        if (result.wave) {
+          const decodedAudioData = urlSafeBase64Decode(result.wave);
+          setAudioURL(`data:audio/wav;base64,${decodedAudioData}`);
+          setAudioReady(true);
+        } else {
+          setError('No audio data received from the service');
+        }
       })
       .catch((error) => {
         setError(error.message);
@@ -72,14 +90,14 @@ export default function Natiq() {
     </button>
     </div>
     {audioReady && (
-      <div>
+      <div className='mt-5'>
         <audio controls autoPlay>
           <source src={audioURL} type="audio/wav" />
           Your browser does not support the audio element.
         </audio>
       </div>
     )}
-    {error && <div className="error-message">{error}</div>}
+    {error && <div className="text-danger">{error}</div>}
   </div>
   )
 }
